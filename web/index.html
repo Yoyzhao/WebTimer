@@ -67,6 +67,16 @@
             z-index: 0;
         }
 
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
         .orb-1 {
             width: 400px;
             height: 400px;
@@ -1148,7 +1158,7 @@
             top: 8px;
             left: 50%;
             margin-left: -1px;
-            transform-origin: center 82px;
+            transform-origin: center 92px;
         }
 
         .clock-marker.major {
@@ -1168,6 +1178,7 @@
     </style>
 </head>
 <body>
+    <canvas id="particles"></canvas>
     <div class="bg-mesh"></div>
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
@@ -2522,6 +2533,86 @@
                 });
             }
         });
+    </script>
+    <script>
+        (function() {
+            const canvas = document.getElementById('particles');
+            const ctx = canvas.getContext('2d');
+            let particles = [];
+            let animationId = null;
+            let isVisible = true;
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+
+            function createParticle() {
+                return {
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2 + 0.5,
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    alpha: Math.random() * 0.5 + 0.2,
+                    color: Math.random() > 0.5 ? '99, 102, 241' : '139, 92, 246'
+                };
+            }
+
+            function init() {
+                resize();
+                particles = [];
+                const count = Math.min(40, Math.floor((canvas.width * canvas.height) / 25000));
+                for (let i = 0; i < count; i++) {
+                    particles.push(createParticle());
+                }
+            }
+
+            function drawParticle(p) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(' + p.color + ', ' + p.alpha + ')';
+                ctx.fill();
+            }
+
+            function updateParticle(p) {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < 0) p.x = canvas.width;
+                else if (p.x > canvas.width) p.x = 0;
+
+                if (p.y < 0) p.y = canvas.height;
+                else if (p.y > canvas.height) p.y = 0;
+
+                p.alpha += (Math.random() - 0.5) * 0.02;
+                p.alpha = Math.max(0.1, Math.min(0.7, p.alpha));
+            }
+
+            function animate() {
+                if (!isVisible) {
+                    animationId = requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                for (const p of particles) {
+                    updateParticle(p);
+                    drawParticle(p);
+                }
+
+                animationId = requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', resize);
+            document.addEventListener('visibilitychange', function() {
+                isVisible = !document.hidden;
+            });
+
+            init();
+            animate();
+        })();
     </script>
 </body>
 </html>
