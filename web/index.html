@@ -1,0 +1,2527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebTimer - 比赛计时器</title>
+    <link rel="stylesheet" href="lib/tailwind.min.css">
+    <link rel="stylesheet" href="lib/fonts.css">
+    <style>
+        :root {
+            --theme-color: #6366f1;
+            --theme-color-dark: #4f46e5;
+            --bg-gradient-1: #0f0f23;
+            --bg-gradient-2: #1a1a3e;
+            --bg-gradient-3: #2d2d5a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 50%, var(--bg-gradient-3) 100%);
+            background-attachment: fixed;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bg-mesh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-mesh::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
+            animation: meshMove 20s ease-in-out infinite;
+        }
+
+        @keyframes meshMove {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-5%, -5%) rotate(5deg); }
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--theme-color);
+            top: -100px;
+            right: -100px;
+            animation: float1 15s ease-in-out infinite;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: #8b5cf6;
+            bottom: -50px;
+            left: -50px;
+            animation: float2 18s ease-in-out infinite;
+        }
+
+        .orb-3 {
+            width: 200px;
+            height: 200px;
+            background: #06b6d4;
+            top: 50%;
+            left: 50%;
+            animation: float3 12s ease-in-out infinite;
+        }
+
+        @keyframes float1 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30px, 30px); }
+        }
+
+        @keyframes float2 {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, -20px); }
+        }
+
+        @keyframes float3 {
+            0%, 100% { transform: translate(-50%, -50%); }
+            50% { transform: translate(-50%, -60%); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1000px;
+            padding: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 1200px;
+                padding: 3rem;
+            }
+        }
+
+        .timer-display {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .timer-ring {
+            position: relative;
+            width: 320px;
+            height: 320px;
+        }
+
+        @media (min-width: 640px) {
+            .timer-ring {
+                width: 400px;
+                height: 400px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .timer-ring {
+                width: 500px;
+                height: 500px;
+            }
+        }
+
+        .timer-ring svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .timer-ring-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 8;
+        }
+
+        .timer-ring-progress {
+            fill: none;
+            stroke: var(--theme-color);
+            stroke-width: 8;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 20px var(--theme-color));
+        }
+
+        .timer-ring-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 280px;
+            background: radial-gradient(circle, var(--theme-color) 0%, transparent 70%);
+            opacity: 0.1;
+            border-radius: 50%;
+            animation: pulseGlow 3s ease-in-out infinite;
+        }
+
+        @media (min-width: 640px) {
+            .timer-ring-glow {
+                width: 350px;
+                height: 350px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .timer-ring-glow {
+                width: 450px;
+                height: 450px;
+            }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.1; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.2; transform: translate(-50%, -50%) scale(1.1); }
+        }
+
+        .timer-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .timer-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 0.05em;
+            text-shadow: 0 0 40px var(--theme-color);
+            line-height: 1;
+        }
+
+        @media (min-width: 640px) {
+            .timer-time {
+                font-size: 5rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .timer-time {
+                font-size: 7rem;
+            }
+        }
+
+        .timer-unit {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            margin-top: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--theme-color), var(--theme-color-dark));
+            color: white;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 15px 50px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 10px 40px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            box-shadow: 0 10px 40px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            box-shadow: 0 10px 40px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-icon {
+            width: 3.5rem;
+            height: 3.5rem;
+            padding: 0;
+            border-radius: 50%;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn:disabled::before {
+            display: none;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .status-dot.running {
+            background: #22c55e;
+            animation: statusPulse 1s ease-in-out infinite;
+        }
+
+        .status-dot.paused {
+            background: #f59e0b;
+        }
+
+        .status-dot.finished {
+            background: #ef4444;
+            animation: none;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .panel-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .panel-close {
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .panel-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--theme-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1rem;
+            padding-right: 3rem;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 3px solid transparent;
+            position: relative;
+        }
+
+        .color-option:hover {
+            transform: scale(1.15);
+        }
+
+        .color-option.selected {
+            border-color: white;
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .color-option.selected::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0.75rem;
+            height: 0.75rem;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .toggle {
+            position: relative;
+            width: 3rem;
+            height: 1.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle.active {
+            background: var(--theme-color);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .toggle.active::after {
+            left: 1.5rem;
+        }
+
+        .file-upload {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            overflow: hidden;
+        }
+
+        .file-upload:hover {
+            border-color: var(--theme-color);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .file-upload input {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            cursor: pointer !important;
+            z-index: 1 !important;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--theme-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .file-upload-icon {
+            width: 3rem;
+            height: 3rem;
+            color: rgba(255, 255, 255, 0.3);
+            margin-bottom: 0.5rem;
+        }
+
+        .file-upload-text {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .file-preview {
+            position: relative;
+            margin-top: 1rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        .file-preview img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .file-preview-audio {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.75rem;
+        }
+
+        .file-preview-remove {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(239, 68, 68, 0.9);
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            width: 100%;
+            max-width: 480px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.95) translateY(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .record-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .record-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.75rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .record-item:hover {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .record-info {
+            flex: 1;
+        }
+
+        .record-name {
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.25rem;
+        }
+
+        .record-date {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .record-duration {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: var(--theme-color);
+        }
+
+        .record-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-left: 0.5rem;
+        }
+
+        .record-status.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+
+        .record-status.paused {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .empty-state-icon {
+            width: 4rem;
+            height: 4rem;
+            margin: 0 auto 1rem;
+            opacity: 0.3;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .detail-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 0.75rem;
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.25rem;
+        }
+
+        .detail-value {
+            font-size: 1rem;
+            color: white;
+            font-weight: 500;
+        }
+
+        .detail-value.mono {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--theme-color);
+        }
+
+        .detail-full {
+            grid-column: span 2;
+        }
+
+        .timestamp-list {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 0.75rem;
+        }
+
+        .timestamp-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .timestamp-item:last-child {
+            border-bottom: none;
+        }
+
+        .timestamp-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+        }
+
+        .timestamp-icon.start { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .timestamp-icon.pause { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .timestamp-icon.resume { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .timestamp-icon.end { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        .timestamp-text {
+            flex: 1;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .timestamp-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.5s ease forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+
+        .running .timer-time {
+            animation: timePulse 1s ease-in-out infinite;
+        }
+
+        @keyframes timePulse {
+            0%, 100% { text-shadow: 0 0 40px var(--theme-color); }
+            50% { text-shadow: 0 0 60px var(--theme-color), 0 0 80px var(--theme-color); }
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .current-time {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 0.5rem;
+            font-family: 'Outfit', sans-serif;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        @media (min-width: 1024px) {
+            .current-time {
+                font-size: 1.5rem;
+            }
+        }
+
+        .header-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.75rem;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.05em;
+        }
+
+        @media (min-width: 1024px) {
+            .header-title {
+                font-size: 3rem;
+            }
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0.75rem;
+            padding: 0.25rem;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            color: white;
+        }
+
+        .mode-btn.active {
+            background: var(--theme-color);
+            color: white;
+        }
+
+        .detailed-layout {
+            display: none;
+        }
+
+        .detailed-layout.active {
+            display: block;
+        }
+
+        .simple-layout.hidden {
+            display: none;
+        }
+
+        .detailed-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            align-items: stretch;
+        }
+
+        @media (min-width: 1024px) {
+            .detailed-container {
+                grid-template-columns: 320px 1fr;
+            }
+        }
+
+        .detailed-header {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        .detailed-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding-top: 2rem;
+            justify-content: space-between;
+            min-height: 500px;
+        }
+
+        .detailed-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+        }
+
+        .detailed-card-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 1rem;
+        }
+
+        .datetime-display {
+            text-align: center;
+        }
+
+        .current-date {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .current-time-large {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--theme-color);
+            text-shadow: 0 0 30px var(--theme-color);
+        }
+
+        .countdown-range {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .range-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .range-label {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .range-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: white;
+            font-weight: 500;
+        }
+
+        .analog-clock {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .clock-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: var(--theme-color);
+            border-radius: 50%;
+            z-index: 3;
+        }
+
+        .clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            border-radius: 4px;
+        }
+
+        .clock-hand.hour {
+            width: 4px;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.8);
+            margin-left: -2px;
+            z-index: 2;
+        }
+
+        .clock-hand.minute {
+            width: 3px;
+            height: 78px;
+            background: rgba(255, 255, 255, 0.6);
+            margin-left: -1.5px;
+            z-index: 1;
+        }
+
+        .clock-hand.second {
+            width: 2px;
+            height: 89px;
+            background: var(--theme-color);
+            margin-left: -1px;
+            z-index: 4;
+        }
+
+        .clock-markers {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .clock-marker {
+            position: absolute;
+            width: 2px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            top: 8px;
+            left: 50%;
+            margin-left: -1px;
+            transform-origin: center 82px;
+        }
+
+        .clock-marker.major {
+            width: 3px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.5);
+            margin-left: -1.5px;
+        }
+
+        .detailed-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-mesh"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <div class="simple-layout" id="simpleLayout">
+        <div class="container">
+            <div class="header-section animate-in">
+                <div class="header-top">
+                    <h1 class="header-title" id="eventNameDisplay">比赛计时器</h1>
+                    <div class="current-time" id="currentTime"></div>
+                </div>
+            </div>
+
+            <div class="timer-display animate-in delay-1">
+                <div class="timer-ring">
+                    <div class="timer-ring-glow"></div>
+                    <svg viewBox="0 0 400 400">
+                        <defs>
+                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="var(--theme-color)" />
+                                <stop offset="100%" stop-color="var(--theme-color-dark)" />
+                            </linearGradient>
+                        </defs>
+                        <circle class="timer-ring-bg" cx="200" cy="200" r="180" />
+                        <circle class="timer-ring-progress" cx="200" cy="200" r="180" id="progressRing" stroke-dasharray="1130.97" />
+                    </svg>
+                    <div class="timer-content">
+                        <div class="timer-time" id="timerDisplay">00:00</div>
+                        <div class="timer-unit" id="timerUnit">秒</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls animate-in delay-2" id="mainControls">
+                <button class="btn btn-success" id="startBtn" onclick="startTimer()">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                    开始
+                </button>
+                <button class="btn btn-warning" id="pauseBtn" onclick="pauseTimer()" style="display: none;">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/></svg>
+                    暂停
+                </button>
+                <button class="btn btn-primary" id="resumeBtn" onclick="resumeTimer()" style="display: none;">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                    继续
+                </button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopTimer()" style="display: none;">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5zM10 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5zM14.25 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z"/></svg>
+                    结束
+                </button>
+                <button class="btn btn-secondary" id="resetBtn" onclick="resetTimer()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    重置
+                </button>
+            </div>
+
+            <div class="action-bar animate-in delay-3">
+                <button class="btn btn-secondary" onclick="toggleSettings()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    设置
+                </button>
+                <button class="btn btn-secondary" onclick="toggleRecords()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    记录
+                </button>
+            </div>
+
+            <div class="text-center mt-4">
+                <div class="status-badge inline-flex" id="statusBadge" style="display: none;">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">进行中</span>
+                </div>
+                <div class="keyboard-hints" style="margin-top: 1rem; font-size: 0.75rem; color: rgba(255, 255, 255, 0.4);">
+                    <span style="margin-right: 1rem;"><kbd style="padding: 0.2rem 0.5rem; background: rgba(255,255,255,0.1); border-radius: 0.25rem; margin-right: 0.25rem;">空格</kbd> 开始/暂停/继续</span>
+                    <span><kbd style="padding: 0.2rem 0.5rem; background: rgba(255,255,255,0.1); border-radius: 0.25rem; margin-right: 0.25rem;">R</kbd> 重置</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detailed-layout" id="detailedLayout">
+        <div class="detailed-container">
+            <div class="detailed-header">
+                <h1 class="header-title" id="eventNameDisplayDetailed">比赛计时器</h1>
+            </div>
+
+            <div class="detailed-left">
+                <div class="detailed-card">
+                    <div class="detailed-card-title">当前时间</div>
+                    <div class="datetime-display">
+                        <div class="current-date" id="detailedDate"></div>
+                        <div class="current-time-large" id="detailedTime"></div>
+                    </div>
+                    <div class="analog-clock" id="analogClock" style="margin-top: 1.5rem;">
+                        <div class="clock-markers" id="clockMarkers"></div>
+                        <div class="clock-hand hour" id="clockHour"></div>
+                        <div class="clock-hand minute" id="clockMinute"></div>
+                        <div class="clock-hand second" id="clockSecond"></div>
+                        <div class="clock-center"></div>
+                    </div>
+                </div>
+
+                <div class="detailed-card">
+                    <div class="detailed-card-title">比赛时间区间</div>
+                    <div class="countdown-range">
+                        <div class="range-item">
+                            <span class="range-label">开始时间</span>
+                            <span class="range-value" id="rangeStart">--:--</span>
+                        </div>
+                        <div class="range-item">
+                            <span class="range-label">结束时间</span>
+                            <span class="range-value" id="rangeEnd">--:--</span>
+                        </div>
+                        <div class="range-item">
+                            <span class="range-label">总时长</span>
+                            <span class="range-value" id="rangeDuration">00:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detailed-right">
+                <div class="timer-display">
+                    <div class="timer-ring">
+                        <div class="timer-ring-glow"></div>
+                        <svg viewBox="0 0 400 400">
+                            <defs>
+                                <linearGradient id="gradientDetailed" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="var(--theme-color)" />
+                                    <stop offset="100%" stop-color="var(--theme-color-dark)" />
+                                </linearGradient>
+                            </defs>
+                            <circle class="timer-ring-bg" cx="200" cy="200" r="180" />
+                            <circle class="timer-ring-progress" cx="200" cy="200" r="180" id="progressRingDetailed" stroke-dasharray="1130.97" />
+                        </svg>
+                        <div class="timer-content">
+                            <div class="timer-time" id="timerDisplayDetailed">00:00</div>
+                            <div class="timer-unit" id="timerUnitDetailed">秒</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls" id="detailedControls">
+                    <button class="btn btn-success" id="startBtnDetailed" onclick="startTimer()">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                        开始
+                    </button>
+                    <button class="btn btn-warning" id="pauseBtnDetailed" onclick="pauseTimer()" style="display: none;">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/></svg>
+                        暂停
+                    </button>
+                    <button class="btn btn-primary" id="resumeBtnDetailed" onclick="resumeTimer()" style="display: none;">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                        继续
+                    </button>
+                    <button class="btn btn-danger" id="stopBtnDetailed" onclick="stopTimer()" style="display: none;">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5zM10 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5zM14.25 7.5a.75.75 0 00-1.5 0v5a.75.75 0 001.5 0v-5z"/></svg>
+                        结束
+                    </button>
+                    <button class="btn btn-secondary" id="resetBtnDetailed" onclick="resetTimer()">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        重置
+                    </button>
+                </div>
+
+                <div class="action-bar" style="margin-top: 1rem;">
+                    <button class="btn btn-secondary" onclick="toggleSettings()">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        设置
+                    </button>
+                    <button class="btn btn-secondary" onclick="toggleRecords()">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        记录
+                    </button>
+                </div>
+
+                <div class="text-center mt-4">
+                    <div class="status-badge inline-flex" id="statusBadgeDetailed" style="display: none;">
+                        <span class="status-dot" id="statusDotDetailed"></span>
+                        <span id="statusTextDetailed">进行中</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content glass-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">设置</h2>
+                <button class="panel-close" onclick="toggleSettings()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="panel-body">
+                <div class="form-group">
+                    <label class="form-label">赛事名称</label>
+                    <input type="text" class="form-input" id="eventNameInput" placeholder="输入赛事名称" onchange="updateConfig()">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">比赛时间</label>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <input type="time" class="form-input" id="matchStartTimeInput" style="flex: 1;" onchange="updateConfig()">
+                        <span style="color: rgba(255,255,255,0.5);">至</span>
+                        <input type="time" class="form-input" id="matchEndTimeInput" style="flex: 1;" onchange="updateConfig()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">计时时间（秒）</label>
+                    <input type="number" class="form-input" id="countdownTimeInput" min="1" max="3600" value="300" onchange="updateConfig()">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">主题颜色</label>
+                    <div class="color-picker">
+                        <div class="color-option selected" style="background: #6366f1;" data-color="#6366f1" data-dark="#4f46e5" onclick="selectColor(this)"></div>
+                        <div class="color-option" style="background: #22c55e;" data-color="#22c55e" data-dark="#16a34a" onclick="selectColor(this)"></div>
+                        <div class="color-option" style="background: #ef4444;" data-color="#ef4444" data-dark="#dc2626" onclick="selectColor(this)"></div>
+                        <div class="color-option" style="background: #f59e0b;" data-color="#f59e0b" data-dark="#d97706" onclick="selectColor(this)"></div>
+                        <div class="color-option" style="background: #8b5cf6;" data-color="#8b5cf6" data-dark="#7c3aed" onclick="selectColor(this)"></div>
+                        <div class="color-option" style="background: #ec4899;" data-color="#ec4899" data-dark="#db2777" onclick="selectColor(this)"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">背景图片</label>
+                    <div class="file-upload" id="bgUpload">
+                        <input type="file" id="bgImageInput" accept="image/*" onchange="handleBgImageUpload(event)">
+                        <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span class="file-upload-text">点击或拖拽上传图片</span>
+                    </div>
+                    <div class="file-preview" id="bgImagePreview" style="display: none;">
+                        <img id="bgPreviewImg" src="" alt="背景预览">
+                        <button class="file-preview-remove" onclick="removeBgImage()">×</button>
+                    </div>
+                    <div id="bgOverlayControl" style="display: none; margin-top: 1rem;">
+                        <label class="form-label">背景遮罩透明度</label>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <input type="range" id="bgOverlayInput" min="0" max="100" value="50" style="flex: 1;" onchange="updateBgOverlay(this.value)" oninput="updateBgOverlay(this.value)">
+                            <span id="bgOverlayValue" style="width: 3rem; text-align: right;">50%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">提示音</label>
+                    <div class="file-upload" id="soundUpload">
+                        <input type="file" id="soundAlertInput" accept="audio/*" onchange="handleSoundUpload(event)">
+                        <svg class="file-upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                        <span class="file-upload-text">点击或拖拽上传音频</span>
+                    </div>
+                    <div class="file-preview-audio" id="soundAlertPreview" style="display: none;">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.197-.982l-4.5 3.261A1 1 0 0012 6v4a1 1 0 01-1 1H8a1 1 0 01-1-1V6.414a1 1 0 00-.293-.707l-3-3A1 1 0 003 3v10a4 4 0 004 4h7a4 4 0 004-4V9a1 1 0 00-1-1h-.003z"/></svg>
+                        <span style="flex: 1; color: rgba(255,255,255,0.7);" id="soundAlertName">自定义提示音</span>
+                        <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.75rem;" onclick="testSound()">测试</button>
+                        <button class="panel-close" onclick="removeSoundAlert()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">界面模式</label>
+                    <div class="mode-toggle">
+                        <button class="mode-btn" id="modeSimple" onclick="setDisplayMode('simple')">简约</button>
+                        <button class="mode-btn" id="modeDetailed" onclick="setDisplayMode('detailed')">详细</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="toggle-group">
+                        <div class="toggle" id="intervalAlertToggle" onclick="toggleIntervalAlert()"></div>
+                        <label class="form-label" style="margin-bottom: 0;">间隔提示音</label>
+                    </div>
+                    <div id="intervalAlertSettings" style="display: none; margin-top: 1rem;">
+                        <div style="margin-bottom: 1rem;">
+                            <label class="form-label">提示模式</label>
+                            <select class="form-input form-select" id="intervalModeSelect" onchange="updateConfig()">
+                                <option value="interval">固定间隔</option>
+                                <option value="timepoint">时间节点</option>
+                            </select>
+                        </div>
+                        <div id="intervalModeSettings">
+                            <div style="display: flex; gap: 1rem;">
+                                <div style="flex: 1;">
+                                    <label class="form-label">间隔时间</label>
+                                    <input type="number" class="form-input" id="intervalTimeInput" min="1" max="999" value="60" onchange="updateConfig()">
+                                </div>
+                                <div style="width: 120px;">
+                                    <label class="form-label">单位</label>
+                                    <select class="form-input form-select" id="intervalUnitSelect" onchange="updateConfig()">
+                                        <option value="seconds">秒</option>
+                                        <option value="minutes">分钟</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="timepointModeSettings" style="display: none;">
+                            <label class="form-label">计时开始后（秒）</label>
+                            <div id="timepointList"></div>
+                            <button class="btn btn-secondary" style="margin-top: 0.5rem; width: 100%;" onclick="addTimePoint()">+ 添加节点</button>
+                            <p style="font-size: 0.75rem; color: rgba(255,255,255,0.5); margin-top: 0.5rem;">提示：设置计时开始后多少秒播放提示音</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-full" style="margin-top: 1rem;" onclick="toggleSettings()">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="recordsModal">
+        <div class="modal-content glass-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">比赛记录</h2>
+                <button class="panel-close" onclick="toggleRecords()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="panel-body">
+                <div class="record-list" id="recordsList">
+                    <div class="empty-state">
+                        <svg class="empty-state-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <p>暂无比赛记录</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="recordDetailModal">
+        <div class="modal-content glass-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">记录详情</h2>
+                <button class="panel-close" onclick="closeRecordDetail()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="panel-body" id="recordDetailContent"></div>
+        </div>
+    </div>
+
+    <audio id="endSound" preload="auto"></audio>
+    <audio id="intervalSound" preload="auto"></audio>
+
+    <script>
+        const CONFIG_KEY = 'webtimer_config';
+        const RECORDS_KEY = 'webtimer_records';
+        const CIRCUMFERENCE = 2 * Math.PI * 180;
+
+        let config = {
+            eventName: '比赛计时器',
+            matchStartTime: '',
+            matchEndTime: '',
+            backgroundImage: '',
+            backgroundOverlay: 0.5,
+            soundAlert: '时间到2.mp3',
+            countdownTime: 300,
+            themeColor: '#6366f1',
+            themeColorDark: '#4f46e5',
+            displayMode: 'simple',
+            intervalAlert: {
+                enabled: false,
+                mode: 'interval',
+                interval: 60,
+                unit: 'seconds',
+                timePoints: [],
+                timePointSounds: {}
+            }
+        };
+
+        let timerState = {
+            status: 'idle',
+            remainingTime: 0,
+            startTime: null,
+            intervalId: null,
+            lastIntervalAlertTime: 0,
+            triggeredTimePoints: [],
+            record: null
+        };
+
+        let currentRecordId = null;
+
+        function loadConfig() {
+            const saved = localStorage.getItem(CONFIG_KEY);
+            if (saved) {
+                config = { ...config, ...JSON.parse(saved) };
+            }
+            applyConfig();
+        }
+
+        function saveConfig() {
+            config.updatedAt = new Date().toISOString();
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        }
+
+        function applyConfig() {
+            document.getElementById('eventNameDisplay').textContent = config.eventName || '比赛计时器';
+            document.getElementById('eventNameInput').value = config.eventName || '';
+            document.getElementById('matchStartTimeInput').value = config.matchStartTime || '';
+            document.getElementById('matchEndTimeInput').value = config.matchEndTime || '';
+            document.getElementById('countdownTimeInput').value = config.countdownTime;
+
+            if (config.matchStartTime && config.matchEndTime) {
+                document.getElementById('countdownTimeInput').disabled = true;
+            } else {
+                document.getElementById('countdownTimeInput').disabled = false;
+            }
+
+            document.documentElement.style.setProperty('--theme-color', config.themeColor);
+            document.documentElement.style.setProperty('--theme-color-dark', config.themeColorDark);
+
+            document.querySelectorAll('.color-option').forEach(el => {
+                el.classList.toggle('selected', el.dataset.color === config.themeColor);
+            });
+
+            if (config.backgroundImage) {
+                const overlay = config.backgroundOverlay ?? 0.5;
+                document.body.style.background = `linear-gradient(rgba(15, 15, 35, ${overlay}), rgba(15, 15, 35, ${overlay})), url(${config.backgroundImage}) center/cover no-repeat fixed`;
+                document.getElementById('bgPreviewImg').src = config.backgroundImage;
+                document.getElementById('bgImagePreview').style.display = 'block';
+                document.getElementById('bgOverlayControl').style.display = 'block';
+                document.getElementById('bgOverlayInput').value = Math.round((config.backgroundOverlay ?? 0.5) * 100);
+                document.getElementById('bgOverlayValue').textContent = Math.round((config.backgroundOverlay ?? 0.5) * 100) + '%';
+            } else {
+                document.body.style.background = '';
+                document.getElementById('bgImagePreview').style.display = 'none';
+                document.getElementById('bgOverlayControl').style.display = 'none';
+            }
+
+            if (config.soundAlert) {
+                document.getElementById('endSound').src = config.soundAlert;
+                document.getElementById('soundAlertPreview').style.display = 'flex';
+            } else {
+                document.getElementById('soundAlertPreview').style.display = 'none';
+            }
+
+            const toggle = document.getElementById('intervalAlertToggle');
+            if (!toggle) return;
+            toggle.classList.toggle('active', config.intervalAlert.enabled);
+            const settingsEl = document.getElementById('intervalAlertSettings');
+            if (settingsEl) {
+                settingsEl.style.display = config.intervalAlert.enabled ? 'block' : 'none';
+            }
+            const modeSelect = document.getElementById('intervalModeSelect');
+            if (modeSelect) {
+                modeSelect.value = config.intervalAlert.mode || 'interval';
+            }
+            const timeInput = document.getElementById('intervalTimeInput');
+            if (timeInput) {
+                timeInput.value = config.intervalAlert.interval;
+            }
+            const unitSelect = document.getElementById('intervalUnitSelect');
+            if (unitSelect) {
+                unitSelect.value = config.intervalAlert.unit;
+            }
+            const intervalModeSettings = document.getElementById('intervalModeSettings');
+            if (intervalModeSettings) {
+                intervalModeSettings.style.display = (config.intervalAlert.mode || 'interval') === 'interval' ? 'block' : 'none';
+            }
+            const timepointModeSettings = document.getElementById('timepointModeSettings');
+            if (timepointModeSettings) {
+                timepointModeSettings.style.display = config.intervalAlert.mode === 'timepoint' ? 'block' : 'none';
+            }
+            renderTimePointList();
+
+            document.getElementById('modeSimple').classList.toggle('active', config.displayMode === 'simple');
+            document.getElementById('modeDetailed').classList.toggle('active', config.displayMode === 'detailed');
+            document.getElementById('simpleLayout').classList.toggle('hidden', config.displayMode === 'detailed');
+            document.getElementById('detailedLayout').classList.toggle('active', config.displayMode === 'detailed');
+
+            if (config.displayMode === 'detailed') {
+                document.getElementById('eventNameDisplayDetailed').textContent = config.eventName || '比赛计时器';
+                updateDetailedDisplay();
+                initAnalogClock();
+            }
+        }
+
+        function updateConfig() {
+            config.eventName = document.getElementById('eventNameInput').value || '比赛计时器';
+            config.matchStartTime = document.getElementById('matchStartTimeInput').value || '';
+            config.matchEndTime = document.getElementById('matchEndTimeInput').value || '';
+
+            if (config.matchStartTime && config.matchEndTime) {
+                const [startH, startM] = config.matchStartTime.split(':').map(Number);
+                const [endH, endM] = config.matchEndTime.split(':').map(Number);
+                let durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                if (durationMinutes < 0) durationMinutes += 24 * 60;
+                config.countdownTime = durationMinutes * 60;
+                document.getElementById('countdownTimeInput').value = config.countdownTime;
+                document.getElementById('countdownTimeInput').disabled = true;
+            } else {
+                config.countdownTime = parseInt(document.getElementById('countdownTimeInput').value) || 300;
+                document.getElementById('countdownTimeInput').disabled = false;
+            }
+
+            config.intervalAlert.enabled = document.getElementById('intervalAlertToggle').classList.contains('active');
+            config.intervalAlert.mode = document.getElementById('intervalModeSelect').value;
+            config.intervalAlert.interval = parseInt(document.getElementById('intervalTimeInput').value) || 60;
+            config.intervalAlert.unit = document.getElementById('intervalUnitSelect').value;
+            if (config.intervalAlert.timePoints) {
+                config.intervalAlert.timePoints = config.intervalAlert.timePoints.filter(t => t <= config.countdownTime);
+            }
+            saveConfig();
+            applyConfig();
+            if (timerState.status === 'idle') {
+                timerState.remainingTime = config.countdownTime;
+                updateDisplay();
+            }
+        }
+
+        function selectColor(el) {
+            document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            config.themeColor = el.dataset.color;
+            config.themeColorDark = el.dataset.dark;
+            saveConfig();
+            applyConfig();
+        }
+
+        function toggleIntervalAlert() {
+            const toggle = document.getElementById('intervalAlertToggle');
+            toggle.classList.toggle('active');
+            document.getElementById('intervalAlertSettings').style.display = toggle.classList.contains('active') ? 'block' : 'none';
+            if (toggle.classList.contains('active')) {
+                document.getElementById('intervalModeSettings').style.display = (config.intervalAlert.mode || 'interval') === 'interval' ? 'block' : 'none';
+                document.getElementById('timepointModeSettings').style.display = config.intervalAlert.mode === 'timepoint' ? 'block' : 'none';
+            }
+            updateConfig();
+        }
+
+        function handleBgImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                config.backgroundImage = e.target.result;
+                saveConfig();
+                applyConfig();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeBgImage() {
+            config.backgroundImage = '';
+            config.backgroundOverlay = 0.5;
+            saveConfig();
+            applyConfig();
+            document.getElementById('bgImageInput').value = '';
+        }
+
+        function updateBgOverlay(value) {
+            config.backgroundOverlay = value / 100;
+            document.getElementById('bgOverlayValue').textContent = value + '%';
+            saveConfig();
+            applyConfig();
+        }
+
+        function renderTimePointList() {
+            const container = document.getElementById('timepointList');
+            if (!container) return;
+
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
+
+            const timePoints = config.intervalAlert.timePoints || [];
+            const timePointSounds = config.intervalAlert.timePointSounds || {};
+            timePoints.sort((a, b) => a - b).forEach((time, index) => {
+                const item = document.createElement('div');
+                item.style.cssText = 'margin-bottom: 0.75rem;';
+
+                const topRow = document.createElement('div');
+                topRow.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;';
+
+                const numberInput = document.createElement('input');
+                numberInput.type = 'number';
+                numberInput.className = 'form-input';
+                numberInput.value = time;
+                numberInput.min = 1;
+                numberInput.max = config.countdownTime;
+                numberInput.style.cssText = 'width: 100px;';
+                numberInput.onchange = () => updateTimePoint(index, numberInput.value);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'panel-close';
+                deleteBtn.style.cssText = 'padding: 0.5rem;';
+                deleteBtn.onclick = () => removeTimePoint(index);
+                deleteBtn.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>`;
+
+                topRow.appendChild(numberInput);
+                topRow.appendChild(deleteBtn);
+
+                const soundWrapper = document.createElement('div');
+                const hasSound = timePointSounds[time];
+
+                if (hasSound) {
+                    soundWrapper.className = 'file-preview-audio';
+                    soundWrapper.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(0, 0, 0, 0.2); border-radius: 0.75rem;';
+                    soundWrapper.innerHTML = `
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.197-.982l-4.5 3.261A1 1 0 0012 6v4a1 1 0 01-1 1H8a1 1 0 01-1-1V6.414a1 1 0 00-.293-.707l-3-3A1 1 0 003 3v10a4 4 0 004 4h7a4 4 0 004-4V9a1 1 0 00-1-1h-.003z"></path></svg>
+                        <span style="flex: 1; color: rgba(255,255,255,0.7);">提示音 ${index + 1}</span>
+                        <button class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.75rem;" onclick="testTimePointSound(${index})">测试</button>
+                        <button class="panel-close" onclick="removeTimePointSound(${index})">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    `;
+                } else {
+                    const fileUpload = document.createElement('div');
+                    fileUpload.className = 'file-upload';
+                    fileUpload.style.cssText = 'padding: 1rem; position: relative;';
+
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'audio/*';
+                    fileInput.style.cssText = 'position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; top: 0; left: 0;';
+                    fileInput.onchange = (e) => handleTimePointSoundUpload(index, e);
+
+                    const uploadIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    uploadIcon.setAttribute('class', 'file-upload-icon');
+                    uploadIcon.setAttribute('fill', 'none');
+                    uploadIcon.setAttribute('stroke', 'currentColor');
+                    uploadIcon.setAttribute('viewBox', '0 0 24 24');
+                    uploadIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>';
+                    uploadIcon.style.cssText = 'width: 24px; height: 24px;';
+
+                    const uploadText = document.createElement('span');
+                    uploadText.className = 'file-upload-text';
+                    uploadText.textContent = '点击或拖拽上传提示音';
+                    uploadText.style.cssText = 'font-size: 0.75rem; color: rgba(255,255,255,0.5);';
+
+                    fileUpload.appendChild(fileInput);
+                    fileUpload.appendChild(uploadIcon);
+                    fileUpload.appendChild(uploadText);
+                    soundWrapper.appendChild(fileUpload);
+                }
+
+                item.appendChild(topRow);
+                item.appendChild(soundWrapper);
+                container.appendChild(item);
+            });
+        }
+
+        function testTimePointSound(index) {
+            const time = config.intervalAlert.timePoints[index];
+            const timePointSounds = config.intervalAlert.timePointSounds || {};
+            if (timePointSounds[time]) {
+                const sound = document.getElementById('intervalSound');
+                sound.src = timePointSounds[time];
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            }
+        }
+
+        function removeTimePointSound(index) {
+            const time = config.intervalAlert.timePoints[index];
+            if (time && config.intervalAlert.timePointSounds) {
+                delete config.intervalAlert.timePointSounds[time];
+                saveConfig();
+                renderTimePointList();
+            }
+        }
+
+        function addTimePoint() {
+            if (!config.intervalAlert.timePoints) {
+                config.intervalAlert.timePoints = [];
+            }
+            const maxTime = config.countdownTime;
+            const lastTime = config.intervalAlert.timePoints.length > 0
+                ? Math.max(...config.intervalAlert.timePoints)
+                : 0;
+            const newTime = Math.min(lastTime + 60, maxTime);
+            if (newTime > 0 && newTime <= maxTime) {
+                config.intervalAlert.timePoints.push(newTime);
+                saveConfig();
+                renderTimePointList();
+            }
+        }
+
+        function updateTimePoint(index, value) {
+            if (!config.intervalAlert.timePoints) {
+                config.intervalAlert.timePoints = [];
+            }
+            const oldTime = config.intervalAlert.timePoints[index];
+            const time = parseInt(value) || 0;
+            const clampedTime = Math.min(Math.max(1, time), config.countdownTime);
+            config.intervalAlert.timePoints[index] = clampedTime;
+
+            if (oldTime && oldTime !== clampedTime && config.intervalAlert.timePointSounds) {
+                const oldSound = config.intervalAlert.timePointSounds[oldTime];
+                if (oldSound) {
+                    delete config.intervalAlert.timePointSounds[oldTime];
+                    config.intervalAlert.timePointSounds[clampedTime] = oldSound;
+                }
+            }
+
+            config.intervalAlert.timePoints.sort((a, b) => a - b);
+            saveConfig();
+            renderTimePointList();
+        }
+
+        function removeTimePoint(index) {
+            if (!config.intervalAlert.timePoints) {
+                config.intervalAlert.timePoints = [];
+            }
+            const removedTime = config.intervalAlert.timePoints[index];
+            if (removedTime && config.intervalAlert.timePointSounds) {
+                delete config.intervalAlert.timePointSounds[removedTime];
+            }
+            config.intervalAlert.timePoints.splice(index, 1);
+            saveConfig();
+            renderTimePointList();
+        }
+
+        function handleSoundUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                config.soundAlert = e.target.result;
+                saveConfig();
+                applyConfig();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleTimePointSoundUpload(index, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const time = config.intervalAlert.timePoints[index];
+                if (!config.intervalAlert.timePointSounds) {
+                    config.intervalAlert.timePointSounds = {};
+                }
+                config.intervalAlert.timePointSounds[time] = e.target.result;
+                saveConfig();
+                renderTimePointList();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeSoundAlert() {
+            config.soundAlert = '';
+            saveConfig();
+            applyConfig();
+            document.getElementById('soundAlertInput').value = '';
+        }
+
+        function testSound() {
+            if (config.soundAlert) {
+                const sound = document.getElementById('endSound');
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            } else {
+                playDefaultSound('end');
+            }
+        }
+
+        function playDefaultSound(type) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (type === 'end') {
+                oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(660, audioContext.currentTime + 0.15);
+                oscillator.frequency.setValueAtTime(880, audioContext.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } else {
+                oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            }
+        }
+
+        function playEndSound() {
+            const sound = document.getElementById('endSound');
+            if (config.soundAlert) {
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            } else {
+                playDefaultSound('end');
+            }
+        }
+
+        function playIntervalSound() {
+            const sound = document.getElementById('intervalSound');
+            if (config.soundAlert) {
+                sound.src = config.soundAlert;
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            } else {
+                playDefaultSound('interval');
+            }
+        }
+
+        function playTimePointSound(soundSrc) {
+            const sound = document.getElementById('intervalSound');
+            sound.src = soundSrc;
+            sound.currentTime = 0;
+            sound.play().catch(() => {});
+        }
+
+        function toggleSettings() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.toggle('active');
+        }
+
+        function toggleRecords() {
+            const modal = document.getElementById('recordsModal');
+            modal.classList.toggle('active');
+            if (modal.classList.contains('active')) {
+                loadRecordsList();
+            }
+        }
+
+        function openRecordDetail(recordId) {
+            currentRecordId = recordId;
+            const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
+            const record = records.find(r => r.id === recordId);
+            if (!record) return;
+
+            const statusMap = { completed: '已完成', paused: '已暂停' };
+            const typeMap = { start: '开始', pause: '暂停', resume: '继续', end: '结束' };
+            const iconMap = { start: 'start', pause: 'pause', resume: 'resume', end: 'end' };
+
+            const content = document.getElementById('recordDetailContent');
+            content.innerHTML = `
+                <div class="detail-grid">
+                    <div class="detail-item detail-full">
+                        <div class="detail-label">赛事名称</div>
+                        <div class="detail-value">${record.eventName}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">开始时间</div>
+                        <div class="detail-value">${new Date(record.startTime).toLocaleString('zh-CN')}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">结束时间</div>
+                        <div class="detail-value">${record.endTime ? new Date(record.endTime).toLocaleString('zh-CN') : '进行中'}</div>
+                    </div>
+                    <div class="detail-item detail-full">
+                        <div class="detail-label">总时长</div>
+                        <div class="detail-value mono">${formatTime(record.duration)}</div>
+                    </div>
+                    <div class="detail-item detail-full">
+                        <div class="detail-label">状态</div>
+                        <div class="detail-value"><span class="record-status ${record.status}">${statusMap[record.status]}</span></div>
+                    </div>
+                </div>
+                <div class="detail-item detail-full" style="margin-top: 1rem;">
+                    <div class="detail-label">时间轴</div>
+                    <div class="timestamp-list">
+                        ${record.timestamps.map(t => `
+                            <div class="timestamp-item">
+                                <div class="timestamp-icon ${iconMap[t.type]}">${typeMap[t.type]}</div>
+                                <div class="timestamp-text">${typeMap[t.type]}</div>
+                                <div class="timestamp-time">${new Date(t.time).toLocaleTimeString('zh-CN')}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="replayRecord()">
+                        <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                        回放
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteCurrentRecord()">
+                        <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2V1a1 1 0 011-1h2a1 1 0 011 1v1h3a1 1 0 110 2h-1v10a2 2 0 01-2 2H7a2 2 0 01-2-2V5H4a1 1 0 110-2h3V1a1 1 0 011-1h2a1 1 0 011 1v1zM7 18a2 2 0 100-4 2 2 0 000 4zM15 6h2a1 1 0 100-2h-2a1 1 0 100 2z"/></svg>
+                        删除
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('recordDetailModal').classList.add('active');
+        }
+
+        function closeRecordDetail() {
+            document.getElementById('recordDetailModal').classList.remove('active');
+            currentRecordId = null;
+        }
+
+        function loadRecordsList() {
+            const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
+            const container = document.getElementById('recordsList');
+
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg class="empty-state-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <p>暂无比赛记录</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = records.map(record => `
+                <div class="record-item" onclick="openRecordDetail('${record.id}')">
+                    <div class="record-info">
+                        <div class="record-name">${record.eventName}</div>
+                        <div class="record-date">${new Date(record.startTime).toLocaleDateString('zh-CN')}</div>
+                    </div>
+                    <div>
+                        <span class="record-duration">${formatTime(record.duration)}</span>
+                        <span class="record-status ${record.status}">${record.status === 'completed' ? '完成' : '暂停'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function replayRecord() {
+            const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
+            const record = records.find(r => r.id === currentRecordId);
+            if (!record) return;
+
+            closeRecordDetail();
+            toggleRecords();
+
+            timerState.remainingTime = config.countdownTime;
+            timerState.record = {
+                id: `record_${Date.now()}`,
+                eventName: record.eventName,
+                startTime: new Date().toISOString(),
+                endTime: null,
+                duration: 0,
+                status: 'paused',
+                timestamps: []
+            };
+
+            updateControlButtons('replay');
+            document.getElementById('statusBadge').style.display = 'inline-flex';
+            document.getElementById('statusDot').className = 'status-dot running';
+            document.getElementById('statusText').textContent = '回放中';
+            if (document.getElementById('statusBadgeDetailed')) {
+                document.getElementById('statusBadgeDetailed').style.display = 'inline-flex';
+                document.getElementById('statusDotDetailed').className = 'status-dot running';
+                document.getElementById('statusTextDetailed').textContent = '回放中';
+            }
+            document.querySelector('.timer-ring').classList.add('running');
+            timerState.status = 'replay';
+            updateDisplay();
+
+            let replayIndex = 0;
+            const replayInterval = setInterval(() => {
+                if (replayIndex < record.timestamps.length) {
+                    const ts = record.timestamps[replayIndex];
+                    if (ts.type === 'end') {
+                        clearInterval(replayInterval);
+                        timerState.status = 'finished';
+                        document.getElementById('statusText').textContent = '回放结束';
+                        document.getElementById('statusDot').className = 'status-dot finished';
+                        if (document.getElementById('statusDotDetailed')) {
+                            document.getElementById('statusTextDetailed').textContent = '回放结束';
+                            document.getElementById('statusDotDetailed').className = 'status-dot finished';
+                        }
+                        document.querySelector('.timer-ring').classList.remove('running');
+                        playEndSound();
+                    }
+                    replayIndex++;
+                }
+            }, 1000);
+        }
+
+        function deleteCurrentRecord() {
+            if (!currentRecordId) return;
+            let records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
+            records = records.filter(r => r.id !== currentRecordId);
+            localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+            closeRecordDetail();
+            loadRecordsList();
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) {
+                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function updateDisplay() {
+            const totalSeconds = Math.max(0, Math.floor(timerState.remainingTime));
+            document.getElementById('timerDisplay').textContent = formatTime(totalSeconds);
+
+            const progress = timerState.remainingTime / config.countdownTime;
+            const offset = CIRCUMFERENCE * (1 - progress);
+            document.getElementById('progressRing').style.strokeDashoffset = offset;
+
+            if (config.displayMode === 'detailed') {
+                document.getElementById('timerDisplayDetailed').textContent = formatTime(totalSeconds);
+                document.getElementById('progressRingDetailed').style.strokeDashoffset = offset;
+            }
+        }
+
+        function updateControlButtons(state) {
+            const startBtn = document.getElementById('startBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            const resumeBtn = document.getElementById('resumeBtn');
+            const stopBtn = document.getElementById('stopBtn');
+
+            const startBtnD = document.getElementById('startBtnDetailed');
+            const pauseBtnD = document.getElementById('pauseBtnDetailed');
+            const resumeBtnD = document.getElementById('resumeBtnDetailed');
+            const stopBtnD = document.getElementById('stopBtnDetailed');
+
+            startBtn.style.display = 'none';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            stopBtn.style.display = 'none';
+            startBtnD.style.display = 'none';
+            pauseBtnD.style.display = 'none';
+            resumeBtnD.style.display = 'none';
+            stopBtnD.style.display = 'none';
+
+            switch (state) {
+                case 'idle':
+                    startBtn.style.display = 'inline-flex';
+                    startBtnD.style.display = 'inline-flex';
+                    break;
+                case 'running':
+                    pauseBtn.style.display = 'inline-flex';
+                    stopBtn.style.display = 'inline-flex';
+                    pauseBtnD.style.display = 'inline-flex';
+                    stopBtnD.style.display = 'inline-flex';
+                    break;
+                case 'paused':
+                    resumeBtn.style.display = 'inline-flex';
+                    stopBtn.style.display = 'inline-flex';
+                    resumeBtnD.style.display = 'inline-flex';
+                    stopBtnD.style.display = 'inline-flex';
+                    break;
+                case 'replay':
+                    pauseBtn.style.display = 'inline-flex';
+                    stopBtn.style.display = 'inline-flex';
+                    pauseBtnD.style.display = 'inline-flex';
+                    stopBtnD.style.display = 'inline-flex';
+                    break;
+            }
+        }
+
+        function startTimer() {
+            if (timerState.status === 'idle') {
+                timerState.remainingTime = config.countdownTime;
+                timerState.record = {
+                    id: `record_${Date.now()}`,
+                    eventName: config.eventName,
+                    startTime: new Date().toISOString(),
+                    endTime: null,
+                    duration: 0,
+                    status: 'running',
+                    timestamps: []
+                };
+                timerState.record.timestamps.push({ type: 'start', time: new Date().toISOString() });
+                timerState.lastIntervalAlertTime = 0;
+                timerState.triggeredTimePoints = [];
+            }
+
+            timerState.status = 'running';
+            timerState.startTime = Date.now() - (config.countdownTime - timerState.remainingTime) * 1000;
+            timerState.lastIntervalAlertTime = 0;
+            timerState.triggeredTimePoints = [];
+
+            updateControlButtons('running');
+            document.getElementById('statusBadge').style.display = 'inline-flex';
+            document.getElementById('statusDot').className = 'status-dot running';
+            document.getElementById('statusText').textContent = '进行中';
+            document.querySelector('.timer-ring').classList.add('running');
+
+            timerState.intervalId = setInterval(tick, 50);
+        }
+
+        function tick() {
+            const elapsed = (Date.now() - timerState.startTime) / 1000;
+            timerState.remainingTime = Math.max(0, config.countdownTime - elapsed);
+
+            if (config.intervalAlert.enabled && timerState.status === 'running') {
+                const mode = config.intervalAlert.mode || 'interval';
+
+                if (mode === 'interval') {
+                    const intervalSeconds = config.intervalAlert.unit === 'minutes'
+                        ? config.intervalAlert.interval * 60
+                        : config.intervalAlert.interval;
+
+                    const currentElapsed = config.countdownTime - timerState.remainingTime;
+                    const currentIntervalNumber = Math.floor(currentElapsed / intervalSeconds);
+                    const lastIntervalNumber = timerState.lastIntervalAlertTime;
+
+                    if (currentIntervalNumber > lastIntervalNumber && currentIntervalNumber >= 1) {
+                        timerState.lastIntervalAlertTime = currentIntervalNumber;
+                        playIntervalSound();
+                    }
+                } else if (mode === 'timepoint') {
+                     const timePoints = config.intervalAlert.timePoints || [];
+                     const timePointSounds = config.intervalAlert.timePointSounds || {};
+                     const currentElapsed = config.countdownTime - timerState.remainingTime;
+
+                     timePoints.forEach((timePoint) => {
+                         if (currentElapsed >= timePoint && !timerState.triggeredTimePoints.includes(timePoint)) {
+                             timerState.triggeredTimePoints.push(timePoint);
+                             if (timePointSounds[timePoint]) {
+                                 playTimePointSound(timePointSounds[timePoint]);
+                             } else {
+                                 playIntervalSound();
+                             }
+                         }
+                     });
+                 }
+            }
+
+            updateDisplay();
+
+            if (timerState.remainingTime <= 0) {
+                timerState.status = 'finished';
+                clearInterval(timerState.intervalId);
+                updateControlButtons('idle');
+                document.getElementById('statusDot').className = 'status-dot finished';
+                document.getElementById('statusText').textContent = '已完成';
+                if (document.getElementById('statusDotDetailed')) {
+                    document.getElementById('statusDotDetailed').className = 'status-dot finished';
+                    document.getElementById('statusTextDetailed').textContent = '已完成';
+                }
+                document.querySelector('.timer-ring').classList.remove('running');
+                playEndSound();
+
+                if (timerState.record) {
+                    timerState.record.endTime = new Date().toISOString();
+                    timerState.record.duration = config.countdownTime;
+                    timerState.record.status = 'completed';
+                    timerState.record.timestamps.push({ type: 'end', time: new Date().toISOString() });
+                    saveRecord(timerState.record);
+                }
+            }
+        }
+
+        function pauseTimer() {
+            timerState.status = 'paused';
+            clearInterval(timerState.intervalId);
+
+            updateControlButtons('paused');
+            document.getElementById('statusDot').className = 'status-dot paused';
+            document.getElementById('statusText').textContent = '已暂停';
+            if (document.getElementById('statusDotDetailed')) {
+                document.getElementById('statusDotDetailed').className = 'status-dot paused';
+                document.getElementById('statusTextDetailed').textContent = '已暂停';
+            }
+            document.querySelector('.timer-ring').classList.remove('running');
+
+            if (timerState.record) {
+                timerState.record.timestamps.push({ type: 'pause', time: new Date().toISOString() });
+            }
+        }
+
+        function resumeTimer() {
+            timerState.status = 'running';
+            timerState.startTime = Date.now() - (config.countdownTime - timerState.remainingTime) * 1000;
+            timerState.lastIntervalAlertTime = 0;
+            timerState.triggeredTimePoints = [];
+
+            updateControlButtons('running');
+            document.getElementById('statusDot').className = 'status-dot running';
+            document.getElementById('statusText').textContent = '进行中';
+            if (document.getElementById('statusDotDetailed')) {
+                document.getElementById('statusDotDetailed').className = 'status-dot running';
+                document.getElementById('statusTextDetailed').textContent = '进行中';
+            }
+            document.querySelector('.timer-ring').classList.add('running');
+
+            if (timerState.record) {
+                timerState.record.timestamps.push({ type: 'resume', time: new Date().toISOString() });
+            }
+
+            timerState.intervalId = setInterval(tick, 50);
+        }
+
+        function stopTimer() {
+            timerState.status = 'finished';
+            clearInterval(timerState.intervalId);
+
+            updateControlButtons('idle');
+            document.getElementById('statusDot').className = 'status-dot finished';
+            document.getElementById('statusText').textContent = '已结束';
+            if (document.getElementById('statusDotDetailed')) {
+                document.getElementById('statusDotDetailed').className = 'status-dot finished';
+                document.getElementById('statusTextDetailed').textContent = '已结束';
+            }
+            document.querySelector('.timer-ring').classList.remove('running');
+
+            if (timerState.record) {
+                timerState.record.endTime = new Date().toISOString();
+                timerState.record.duration = config.countdownTime - timerState.remainingTime;
+                timerState.record.status = 'paused';
+                timerState.record.timestamps.push({ type: 'end', time: new Date().toISOString() });
+                saveRecord(timerState.record);
+            }
+        }
+
+        function resetTimer() {
+            timerState.status = 'idle';
+            timerState.remainingTime = config.countdownTime;
+            timerState.record = null;
+            clearInterval(timerState.intervalId);
+
+            updateControlButtons('idle');
+            document.getElementById('statusBadge').style.display = 'none';
+            if (document.getElementById('statusBadgeDetailed')) {
+                document.getElementById('statusBadgeDetailed').style.display = 'none';
+            }
+            document.querySelector('.timer-ring').classList.remove('running');
+
+            updateDisplay();
+        }
+
+        function saveRecord(record) {
+            const records = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]');
+            const existingIndex = records.findIndex(r => r.id === record.id);
+            if (existingIndex >= 0) {
+                records[existingIndex] = record;
+            } else {
+                records.unshift(record);
+            }
+            localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            resetTimer();
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+        });
+
+        function updateCurrentTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('currentTime').textContent = `${year}/${month}/${day} ${hours}:${minutes}`;
+
+            if (config.displayMode === 'detailed') {
+                updateDetailedDisplay();
+            }
+
+            if (config.matchStartTime && timerState.status === 'idle') {
+                const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                if (currentTimeStr === config.matchStartTime) {
+                    startTimer();
+                }
+            }
+        }
+
+        function setDisplayMode(mode) {
+            config.displayMode = mode;
+            saveConfig();
+            applyConfig();
+        }
+
+        function updateDetailedDisplay() {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+
+            document.getElementById('detailedDate').textContent = dateStr;
+            document.getElementById('detailedTime').textContent = timeStr;
+
+            if (config.matchStartTime && config.matchEndTime) {
+                document.getElementById('rangeStart').textContent = config.matchStartTime;
+                document.getElementById('rangeEnd').textContent = config.matchEndTime;
+
+                const [startH, startM] = config.matchStartTime.split(':').map(Number);
+                const [endH, endM] = config.matchEndTime.split(':').map(Number);
+                let durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                if (durationMinutes < 0) durationMinutes += 24 * 60;
+                document.getElementById('rangeDuration').textContent = formatTime(durationMinutes * 60);
+            } else if (timerState.status === 'running' || timerState.status === 'paused') {
+                const startTime = new Date(timerState.record?.startTime || Date.now());
+                document.getElementById('rangeStart').textContent = `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}:${startTime.getSeconds().toString().padStart(2, '0')}`;
+
+                const endTime = new Date(startTime.getTime() + config.countdownTime * 1000);
+                document.getElementById('rangeEnd').textContent = `${endTime.getHours().toString().padStart(2, '0')}:${endTime.getMinutes().toString().padStart(2, '0')}:${endTime.getSeconds().toString().padStart(2, '0')}`;
+
+                document.getElementById('rangeDuration').textContent = formatTime(config.countdownTime);
+            } else {
+                document.getElementById('rangeStart').textContent = '--:--';
+                document.getElementById('rangeEnd').textContent = '--:--';
+                document.getElementById('rangeDuration').textContent = formatTime(config.countdownTime);
+            }
+
+            updateAnalogClock();
+        }
+
+        function initAnalogClock() {
+            const markersContainer = document.getElementById('clockMarkers');
+            if (!markersContainer || markersContainer.children.length > 0) return;
+
+            for (let i = 0; i < 12; i++) {
+                const marker = document.createElement('div');
+                marker.className = `clock-marker ${i % 3 === 0 ? 'major' : ''}`;
+                marker.style.transform = `rotate(${i * 30}deg)`;
+                markersContainer.appendChild(marker);
+            }
+        }
+
+        function updateAnalogClock() {
+            const now = new Date();
+            const hours = now.getHours() % 12;
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+
+            const hourDeg = (hours + minutes / 60) * 30;
+            const minuteDeg = (minutes + seconds / 60) * 6;
+            const secondDeg = seconds * 6;
+
+            document.getElementById('clockHour').style.transform = `rotate(${hourDeg}deg)`;
+            document.getElementById('clockMinute').style.transform = `rotate(${minuteDeg}deg)`;
+            document.getElementById('clockSecond').style.transform = `rotate(${secondDeg}deg)`;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (timerState.status === 'idle') {
+                    startTimer();
+                } else if (timerState.status === 'running') {
+                    pauseTimer();
+                } else if (timerState.status === 'paused') {
+                    resumeTimer();
+                }
+            } else if (e.code === 'KeyR') {
+                e.preventDefault();
+                resetTimer();
+            } else if (e.code === 'Escape') {
+                document.querySelectorAll('.modal-overlay.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
