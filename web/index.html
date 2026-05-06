@@ -1175,6 +1175,25 @@
             justify-content: center;
             min-height: 500px;
         }
+
+        .click-hint {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(99, 102, 241, 0.9);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            z-index: 9999;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
@@ -1183,6 +1202,7 @@
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
+    <div id="clickHint" class="click-hint" style="display: none;">点击页面以启用提示音</div>
 
     <div class="simple-layout" id="simpleLayout">
         <div class="container">
@@ -1530,6 +1550,7 @@
     <script>
         const CONFIG_KEY = 'webtimer_config';
         const RECORDS_KEY = 'webtimer_records';
+        const STATE_KEY = 'webtimer_state';
         const CIRCUMFERENCE = 2 * Math.PI * 180;
 
         let config = {
@@ -1576,6 +1597,59 @@
         function saveConfig() {
             config.updatedAt = new Date().toISOString();
             localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        }
+
+        function saveState() {
+            if (timerState.status === 'idle') {
+                localStorage.removeItem(STATE_KEY);
+                return;
+            }
+            const stateToSave = {
+                status: timerState.status,
+                remainingTime: timerState.remainingTime,
+                record: timerState.record,
+                lastIntervalAlertTime: timerState.lastIntervalAlertTime,
+                triggeredTimePoints: timerState.triggeredTimePoints,
+                savedAt: Date.now()
+            };
+            localStorage.setItem(STATE_KEY, JSON.stringify(stateToSave));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem(STATE_KEY);
+            if (!saved) return false;
+
+            try {
+                const state = JSON.parse(saved);
+                if (state.status === 'idle') return false;
+
+                if (state.status === 'running') {
+                    const elapsed = (Date.now() - state.savedAt) / 1000;
+                    timerState.remainingTime = Math.max(0, state.remainingTime - elapsed);
+                    timerState.status = timerState.remainingTime <= 0 ? 'finished' : 'running';
+                } else {
+                    timerState.remainingTime = state.remainingTime;
+                    timerState.status = state.status;
+                }
+
+                timerState.record = state.record;
+                timerState.lastIntervalAlertTime = state.lastIntervalAlertTime || 0;
+                timerState.triggeredTimePoints = state.triggeredTimePoints || [];
+                timerState.startTime = state.savedAt - (config.countdownTime - timerState.remainingTime) * 1000;
+
+                if (timerState.status === 'finished' && timerState.record) {
+                    timerState.record.endTime = new Date().toISOString();
+                    timerState.record.duration = config.countdownTime;
+                    timerState.record.status = 'completed';
+                    timerState.record.timestamps.push({ type: 'end', time: new Date().toISOString() });
+                    saveRecord(timerState.record);
+                }
+
+                return timerState.status !== 'idle';
+            } catch (e) {
+                localStorage.removeItem(STATE_KEY);
+                return false;
+            }
         }
 
         function applyConfig() {
@@ -1972,7 +2046,19 @@
             const sound = document.getElementById('endSound');
             if (config.soundAlert) {
                 sound.currentTime = 0;
-                sound.play().catch(() => {});
+                sound.play().catch((e) => {
+                    if (e.name === 'NotAllowedError') {
+                        showClickHint();
+                        const tryPlay = () => {
+                            hideClickHint();
+                            sound.play().catch(() => {});
+                            document.removeEventListener('click', tryPlay);
+                            document.removeEventListener('touchstart', tryPlay);
+                        };
+                        document.addEventListener('click', tryPlay);
+                        document.addEventListener('touchstart', tryPlay);
+                    }
+                });
             } else {
                 playDefaultSound('end');
             }
@@ -1983,9 +2069,40 @@
             if (config.soundAlert) {
                 sound.src = config.soundAlert;
                 sound.currentTime = 0;
-                sound.play().catch(() => {});
+                sound.play().catch((e) => {
+                    if (e.name === 'NotAllowedError') {
+                        showClickHint();
+                        const tryPlay = () => {
+                            hideClickHint();
+                            sound.play().catch(() => {});
+                            document.removeEventListener('click', tryPlay);
+                            document.removeEventListener('touchstart', tryPlay);
+                        };
+                        document.addEventListener('click', tryPlay);
+                        document.addEventListener('touchstart', tryPlay);
+                    }
+                });
             } else {
                 playDefaultSound('interval');
+            }
+        }
+
+        let pendingSounds = [];
+
+        function showClickHint() {
+            const hint = document.getElementById('clickHint');
+            if (hint) {
+                hint.style.display = 'block';
+                setTimeout(() => {
+                    hint.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function hideClickHint() {
+            const hint = document.getElementById('clickHint');
+            if (hint) {
+                hint.style.display = 'none';
             }
         }
 
@@ -1993,7 +2110,31 @@
             const sound = document.getElementById('intervalSound');
             sound.src = soundSrc;
             sound.currentTime = 0;
-            sound.play().catch(() => {});
+            sound.play().catch((e) => {
+                if (e.name === 'NotAllowedError') {
+                    if (!pendingSounds.includes(soundSrc)) {
+                        pendingSounds.push(soundSrc);
+                    }
+                    if (pendingSounds.length === 1) {
+                        showClickHint();
+                        const playAll = () => {
+                            hideClickHint();
+                            pendingSounds.forEach((src, i) => {
+                                setTimeout(() => {
+                                    sound.src = src;
+                                    sound.currentTime = 0;
+                                    sound.play().catch(() => {});
+                                }, i * 500);
+                            });
+                            pendingSounds = [];
+                            document.removeEventListener('click', playAll);
+                            document.removeEventListener('touchstart', playAll);
+                        };
+                        document.addEventListener('click', playAll);
+                        document.addEventListener('touchstart', playAll);
+                    }
+                }
+            });
         }
 
         function toggleSettings() {
@@ -2123,15 +2264,9 @@
             };
 
             updateControlButtons('replay');
-            document.getElementById('statusBadge').style.display = 'inline-flex';
-            document.getElementById('statusDot').className = 'status-dot running';
-            document.getElementById('statusText').textContent = '回放中';
-            if (document.getElementById('statusBadgeDetailed')) {
-                document.getElementById('statusBadgeDetailed').style.display = 'inline-flex';
-                document.getElementById('statusDotDetailed').className = 'status-dot running';
-                document.getElementById('statusTextDetailed').textContent = '回放中';
-            }
-            document.querySelector('.timer-ring').classList.add('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+            activeRing.classList.add('running');
             timerState.status = 'replay';
             updateDisplay();
 
@@ -2142,13 +2277,9 @@
                     if (ts.type === 'end') {
                         clearInterval(replayInterval);
                         timerState.status = 'finished';
-                        document.getElementById('statusText').textContent = '回放结束';
-                        document.getElementById('statusDot').className = 'status-dot finished';
-                        if (document.getElementById('statusDotDetailed')) {
-                            document.getElementById('statusTextDetailed').textContent = '回放结束';
-                            document.getElementById('statusDotDetailed').className = 'status-dot finished';
-                        }
-                        document.querySelector('.timer-ring').classList.remove('running');
+                        const timerRings = document.querySelectorAll('.timer-ring');
+                        const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+                        activeRing.classList.remove('running');
                         playEndSound();
                     }
                     replayIndex++;
@@ -2258,12 +2389,12 @@
             timerState.triggeredTimePoints = [];
 
             updateControlButtons('running');
-            document.getElementById('statusBadge').style.display = 'inline-flex';
-            document.getElementById('statusDot').className = 'status-dot running';
-            document.getElementById('statusText').textContent = '进行中';
-            document.querySelector('.timer-ring').classList.add('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+            activeRing.classList.add('running');
 
             timerState.intervalId = setInterval(tick, 50);
+            saveState();
         }
 
         function tick() {
@@ -2294,8 +2425,10 @@
                      timePoints.forEach((timePoint) => {
                          if (currentElapsed >= timePoint && !timerState.triggeredTimePoints.includes(timePoint)) {
                              timerState.triggeredTimePoints.push(timePoint);
-                             if (timePointSounds[timePoint]) {
-                                 playTimePointSound(timePointSounds[timePoint]);
+                             const timePointKey = String(timePoint);
+                             const soundSrc = timePointSounds[timePointKey];
+                             if (soundSrc) {
+                                 playTimePointSound(soundSrc);
                              } else {
                                  playIntervalSound();
                              }
@@ -2305,18 +2438,15 @@
             }
 
             updateDisplay();
+            saveState();
 
             if (timerState.remainingTime <= 0) {
                 timerState.status = 'finished';
                 clearInterval(timerState.intervalId);
                 updateControlButtons('idle');
-                document.getElementById('statusDot').className = 'status-dot finished';
-                document.getElementById('statusText').textContent = '已完成';
-                if (document.getElementById('statusDotDetailed')) {
-                    document.getElementById('statusDotDetailed').className = 'status-dot finished';
-                    document.getElementById('statusTextDetailed').textContent = '已完成';
-                }
-                document.querySelector('.timer-ring').classList.remove('running');
+                const timerRings = document.querySelectorAll('.timer-ring');
+                const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+                activeRing.classList.remove('running');
                 playEndSound();
 
                 if (timerState.record) {
@@ -2334,17 +2464,14 @@
             clearInterval(timerState.intervalId);
 
             updateControlButtons('paused');
-            document.getElementById('statusDot').className = 'status-dot paused';
-            document.getElementById('statusText').textContent = '已暂停';
-            if (document.getElementById('statusDotDetailed')) {
-                document.getElementById('statusDotDetailed').className = 'status-dot paused';
-                document.getElementById('statusTextDetailed').textContent = '已暂停';
-            }
-            document.querySelector('.timer-ring').classList.remove('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+            activeRing.classList.remove('running');
 
             if (timerState.record) {
                 timerState.record.timestamps.push({ type: 'pause', time: new Date().toISOString() });
             }
+            saveState();
         }
 
         function resumeTimer() {
@@ -2354,19 +2481,16 @@
             timerState.triggeredTimePoints = [];
 
             updateControlButtons('running');
-            document.getElementById('statusDot').className = 'status-dot running';
-            document.getElementById('statusText').textContent = '进行中';
-            if (document.getElementById('statusDotDetailed')) {
-                document.getElementById('statusDotDetailed').className = 'status-dot running';
-                document.getElementById('statusTextDetailed').textContent = '进行中';
-            }
-            document.querySelector('.timer-ring').classList.add('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+            activeRing.classList.add('running');
 
             if (timerState.record) {
                 timerState.record.timestamps.push({ type: 'resume', time: new Date().toISOString() });
             }
 
             timerState.intervalId = setInterval(tick, 50);
+            saveState();
         }
 
         function stopTimer() {
@@ -2374,13 +2498,9 @@
             clearInterval(timerState.intervalId);
 
             updateControlButtons('idle');
-            document.getElementById('statusDot').className = 'status-dot finished';
-            document.getElementById('statusText').textContent = '已结束';
-            if (document.getElementById('statusDotDetailed')) {
-                document.getElementById('statusDotDetailed').className = 'status-dot finished';
-                document.getElementById('statusTextDetailed').textContent = '已结束';
-            }
-            document.querySelector('.timer-ring').classList.remove('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = config.displayMode === 'detailed' ? timerRings[1] : timerRings[0];
+            activeRing.classList.remove('running');
 
             if (timerState.record) {
                 timerState.record.endTime = new Date().toISOString();
@@ -2398,13 +2518,12 @@
             clearInterval(timerState.intervalId);
 
             updateControlButtons('idle');
-            document.getElementById('statusBadge').style.display = 'none';
-            if (document.getElementById('statusBadgeDetailed')) {
-                document.getElementById('statusBadgeDetailed').style.display = 'none';
-            }
-            document.querySelector('.timer-ring').classList.remove('running');
+            const timerRings = document.querySelectorAll('.timer-ring');
+            timerRings[0].classList.remove('running');
+            if (timerRings[1]) timerRings[1].classList.remove('running');
 
             updateDisplay();
+            saveState();
         }
 
         function saveRecord(record) {
@@ -2420,10 +2539,53 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadConfig();
-            resetTimer();
+            const hasRestoredState = loadState();
+            if (hasRestoredState) {
+                restoreTimerState();
+            } else {
+                resetTimer();
+            }
             updateCurrentTime();
             setInterval(updateCurrentTime, 1000);
         });
+
+        function restoreTimerState() {
+            updateDisplay();
+
+            const status = timerState.status;
+            const isDetailed = config.displayMode === 'detailed';
+
+            if (isDetailed) {
+                updateDetailedDisplay();
+            }
+
+            const timerRings = document.querySelectorAll('.timer-ring');
+            const activeRing = isDetailed ? timerRings[1] : timerRings[0];
+
+            if (status === 'running') {
+                activeRing.classList.add('running');
+            }
+
+            if (status === 'running' && config.intervalAlert.mode === 'timepoint') {
+                const timePoints = config.intervalAlert.timePoints || [];
+                const currentElapsed = config.countdownTime - timerState.remainingTime;
+                const hasPendingTimePoints = timePoints.some(tp =>
+                    currentElapsed >= tp && !timerState.triggeredTimePoints.includes(tp)
+                );
+                if (hasPendingTimePoints) {
+                    showClickHint();
+                }
+            }
+
+            updateControlButtons(status === 'finished' ? 'idle' : status);
+
+            if (status === 'running') {
+                timerState.intervalId = setInterval(tick, 50);
+            } else if (status === 'finished') {
+                activeRing.classList.remove('running');
+                playEndSound();
+            }
+        }
 
         function updateCurrentTime() {
             const now = new Date();
