@@ -1669,6 +1669,7 @@
             themeColor: '#6366f1',
             themeColorDark: '#4f46e5',
             displayMode: 'simple',
+            matchMusicLoop: false,
             intervalAlert: {
                 enabled: false,
                 mode: 'interval',
@@ -2066,8 +2067,9 @@
         async function toggleMusicLoop() {
             const toggle = document.getElementById('musicLoopToggle');
             toggle.classList.toggle('active');
+            config.matchMusicLoop = toggle.classList.contains('active');
             const audio = document.getElementById('matchBackgroundMusic');
-            audio.loop = toggle.classList.contains('active');
+            audio.loop = config.matchMusicLoop;
             await saveConfig();
         }
 
@@ -2075,10 +2077,8 @@
             const hasBg = mediaStore.matchBackgroundImage;
             const hasMusic = mediaStore.matchBackgroundMusic;
             document.getElementById('matchModeToggleBtn').style.display = hasBg ? 'flex' : 'none';
-
-            if (hasMusic) {
-                document.getElementById('matchBackgroundMusic').loop = document.getElementById('musicLoopToggle').classList.contains('active');
-            }
+            const toggle = document.getElementById('musicLoopToggle');
+            toggle.classList.toggle('active', config.matchMusicLoop);
         }
 
         function enterMatchMode() {
@@ -2089,6 +2089,7 @@
             const audio = document.getElementById('matchBackgroundMusic');
             if (mediaStore.matchBackgroundMusic) {
                 audio.src = mediaStore.matchBackgroundMusic;
+                audio.loop = config.matchMusicLoop;
             }
         }
 
