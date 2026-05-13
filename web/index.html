@@ -1253,10 +1253,8 @@
             font-size: 1.5rem;
         }
         .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-        .screen:hover .nav-btn {
             opacity: 1;
+            background: rgba(255, 255, 255, 0.3);
         }
         .nav-prev { left: 2rem; }
         .nav-next { right: 2rem; }
@@ -2176,6 +2174,14 @@
             document.getElementById('matchModeToggleBtn').style.display = hasBg ? 'flex' : 'none';
             const toggle = document.getElementById('musicLoopToggle');
             toggle.classList.toggle('active', config.matchMusicLoop);
+
+            if (hasMusic) {
+                document.getElementById('matchMusicPreview').style.display = 'flex';
+                document.getElementById('matchMusicUpload').style.display = 'none';
+            } else {
+                document.getElementById('matchMusicPreview').style.display = 'none';
+                document.getElementById('matchMusicUpload').style.display = 'block';
+            }
         }
 
         function enterMatchMode() {
@@ -2585,6 +2591,9 @@
         function toggleSettings() {
             const modal = document.getElementById('settingsModal');
             modal.classList.toggle('active');
+            if (modal.classList.contains('active')) {
+                updateMatchModeUI();
+            }
         }
 
         function toggleRecords() {
@@ -3143,8 +3152,18 @@
                 resetTimer();
             } else if (e.code === 'KeyP') {
                 e.preventDefault();
-                if (document.getElementById('matchModeOverlay').style.display === 'block') {
+                if (currentScreen === 2 && document.getElementById('matchModeOverlay').style.display === 'block') {
                     toggleMatchMusic();
+                } else if (currentScreen === 1) {
+                    const iframe = document.getElementById('iframeStart');
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ action: 'toggleMusic' }, '*');
+                    }
+                } else if (currentScreen === 3) {
+                    const iframe = document.getElementById('iframeEnd');
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ action: 'toggleMusic' }, '*');
+                    }
                 }
             } else if (e.code === 'KeyS') {
                 e.preventDefault();
@@ -3178,13 +3197,17 @@
             const targetId = screenNumber === 1 ? 'screenStart' : screenNumber === 2 ? 'screenTimer' : 'screenEnd';
             document.getElementById(targetId).classList.add('active');
             currentScreen = screenNumber;
-
-            if (screenNumber === 1 && startIframe && startIframe.contentWindow) {
-                startIframe.contentWindow.postMessage({ action: 'playMusic' }, '*');
-            } else if (screenNumber === 3 && endIframe && endIframe.contentWindow) {
-                endIframe.contentWindow.postMessage({ action: 'playMusic' }, '*');
-            }
         }
+
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'screenNavigation') {
+                if (e.data.code === 'ArrowLeft') {
+                    goToScreen(currentScreen - 1);
+                } else if (e.data.code === 'ArrowRight') {
+                    goToScreen(currentScreen + 1);
+                }
+            }
+        });
     </script>
     <script>
         (function() {

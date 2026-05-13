@@ -50,15 +50,26 @@
             letter-spacing: 0.05em;
         }
 
+        .screen-title:empty,
+        .screen-title[data-empty="true"] {
+            display: none;
+            margin-bottom: 0;
+        }
+
         .screen-subtitle {
             font-size: 1.5rem;
             color: rgba(255, 255, 255, 0.8);
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
 
+        .screen-subtitle:empty,
+        .screen-subtitle[data-empty="true"] {
+            display: none;
+        }
+
         .settings-btn {
             position: absolute;
-            top: 1.5rem;
+            bottom: 1.5rem;
             right: 1.5rem;
             width: 44px;
             height: 44px;
@@ -76,7 +87,16 @@
             z-index: 20;
         }
 
-        body:hover .settings-btn {
+        .settings-btn:hover {
+            opacity: 1;
+        }
+
+        #musicBtn {
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #musicBtn:hover {
             opacity: 1;
         }
 
@@ -362,6 +382,15 @@
         </svg>
     </button>
 
+    <button id="musicBtn" onclick="togglePageMusic()" style="position: absolute; bottom: 1.5rem; right: 5rem; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 20;">
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20" id="pagePlayIcon">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+        </svg>
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20" id="pagePauseIcon" style="display: none;">
+            <path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.5 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/>
+        </svg>
+    </button>
+
     <div class="settings-panel" id="settingsPanel">
         <div class="settings-content">
             <div class="panel-header">
@@ -408,9 +437,14 @@
                     <span class="file-upload-text">点击或拖拽上传音频</span>
                 </div>
                 <div class="file-preview-audio" id="musicPreview" style="display: none;">
-                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M18 3a1 1 0 00-1.197-.982l-4.5 3.261A1 1 0 0012 6v4a1 1 0 01-1 1H8a1 1 0 01-1-1V6.414a1 1 0 00-.293-.707l-3-3A1 1 0 003 3v10a4 4 0 004 4h7a4 4 0 004-4V9a1 1 0 00-1-1h-.003z"/>
-                    </svg>
+                    <button class="panel-close" id="musicPlayBtn" onclick="togglePreviewMusic()" style="width: 2rem; height: 2rem; position: static;">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20" id="playIcon">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+                        </svg>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20" id="pauseIcon" style="display: none;">
+                            <path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.5 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/>
+                        </svg>
+                    </button>
                     <span style="flex: 1; color: rgba(255,255,255,0.7);" id="musicName">背景音乐</span>
                     <button class="panel-close" onclick="removeMusic()">
                         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,10 +578,14 @@
         }
 
         function applyConfig() {
-            document.getElementById('title').textContent = config.title || '比赛结束';
-            document.getElementById('subtitle').textContent = config.subtitle || '感谢参与';
-            document.getElementById('titleInput').value = config.title || '';
-            document.getElementById('subtitleInput').value = config.subtitle || '';
+            const titleValue = config.title !== undefined ? config.title : '比赛结束';
+            const subtitleValue = config.subtitle !== undefined ? config.subtitle : '感谢参与';
+            document.getElementById('title').textContent = titleValue;
+            document.getElementById('title').setAttribute('data-empty', titleValue === '' ? 'true' : 'false');
+            document.getElementById('subtitle').textContent = subtitleValue;
+            document.getElementById('subtitle').setAttribute('data-empty', subtitleValue === '' ? 'true' : 'false');
+            document.getElementById('titleInput').value = config.title !== undefined ? config.title : '';
+            document.getElementById('subtitleInput').value = config.subtitle !== undefined ? config.subtitle : '';
 
             if (media.backgroundImage) {
                 document.getElementById('bg').style.backgroundImage = `url(${media.backgroundImage})`;
@@ -563,17 +601,19 @@
             if (media.backgroundMusic) {
                 document.getElementById('musicPreview').style.display = 'flex';
                 document.getElementById('musicUpload').style.display = 'none';
+                document.getElementById('musicBtn').style.display = 'flex';
             } else {
                 document.getElementById('musicPreview').style.display = 'none';
                 document.getElementById('musicUpload').style.display = 'flex';
+                document.getElementById('musicBtn').style.display = 'none';
             }
 
             document.getElementById('musicLoopToggle').classList.toggle('active', config.musicLoop);
         }
 
         function updateConfig() {
-            config.title = document.getElementById('titleInput').value || '比赛结束';
-            config.subtitle = document.getElementById('subtitleInput').value || '感谢参与';
+            config.title = document.getElementById('titleInput').value;
+            config.subtitle = document.getElementById('subtitleInput').value;
             saveConfig();
             applyConfig();
         }
@@ -645,17 +685,58 @@
                 }
                 audio.loop = config.musicLoop;
                 audio.play().catch(() => {});
+                document.getElementById('playIcon').style.display = 'none';
+                document.getElementById('pauseIcon').style.display = 'block';
+                document.getElementById('pagePlayIcon').style.display = 'none';
+                document.getElementById('pagePauseIcon').style.display = 'block';
             }
         }
 
         function pauseMusic() {
             const audio = document.getElementById('bgMusic');
             audio.pause();
+            document.getElementById('playIcon').style.display = 'block';
+            document.getElementById('pauseIcon').style.display = 'none';
+            document.getElementById('pagePlayIcon').style.display = 'block';
+            document.getElementById('pagePauseIcon').style.display = 'none';
+        }
+
+        function togglePreviewMusic() {
+            const audio = document.getElementById('bgMusic');
+            if (audio.paused) {
+                playMusic();
+                document.getElementById('playIcon').style.display = 'none';
+                document.getElementById('pauseIcon').style.display = 'block';
+            } else {
+                pauseMusic();
+            }
+        }
+
+        function togglePageMusic() {
+            if (!media.backgroundMusic) return;
+            const audio = document.getElementById('bgMusic');
+            if (audio.paused || audio.currentTime === 0) {
+                playMusic();
+            } else {
+                pauseMusic();
+            }
         }
 
         window.addEventListener('message', (e) => {
             if (e.data.action === 'playMusic') playMusic();
             else if (e.data.action === 'pauseMusic') pauseMusic();
+            else if (e.data.action === 'toggleMusic') togglePageMusic();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+                window.parent.postMessage({
+                    type: 'screenNavigation',
+                    code: e.code,
+                    screen: 3
+                }, '*');
+            }
         });
 
         document.addEventListener('DOMContentLoaded', async () => {
